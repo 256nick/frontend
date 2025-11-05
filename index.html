@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Drone Dashboard</title>
+  <style>
+    /* Basic Styles */
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: #f4f7f6;
+      margin: 0;
+      padding: 20px;
+      color: #333;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      background-color: #fff;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+      overflow: hidden;
+    }
+
+    /* Navigation */
+    nav {
+      display: flex;
+      background-color: #0056b3;
+      border-bottom: 4px solid #004a99;
+    }
+
+    nav button {
+      flex-grow: 1;
+      padding: 16px;
+      font-size: 16px;
+      font-weight: bold;
+      color: white;
+      background-color: #0056b3;
+      border: none;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+
+    nav button:hover {
+      background-color: #006cdd;
+    }
+
+    nav button.active {
+      background-color: #004a99;
+      box-shadow: inset 0 3px 5px rgba(0, 0, 0, 0.2);
+    }
+
+    /* Page Content */
+    .page {
+      padding: 24px;
+      display: none; /* ซ่อนทุกหน้าไว้ก่อน */
+    }
+
+    .page.active {
+      display: block; /* แสดงเฉพาะหน้าท Active */
+    }
+
+    h1 {
+      margin-top: 0;
+      color: #0056b3;
+    }
+
+    /* Page 1: Config */
+    .config-grid {
+      display: grid;
+      grid-template-columns: 150px 1fr;
+      gap: 12px;
+    }
+
+    .config-grid strong {
+      color: #555;
+    }
+
+    /* Page 2: Form */
+    .log-form {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      max-width: 400px;
+    }
+
+    .log-form label {
+      font-weight: bold;
+    }
+
+    .log-form input[type="number"] {
+      padding: 10px;
+      font-size: 16px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+
+    .log-form button {
+      padding: 12px;
+      font-size: 16px;
+      font-weight: bold;
+      color: white;
+      background-color: #28a745;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+
+    .log-form button:hover {
+      background-color: #218838;
+    }
+
+    #form-status {
+      margin-top: 10px;
+      font-weight: bold;
+    }
+
+    /* Page 3: Logs Table */
+    .logs-table-wrapper {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+
+    th, td {
+      border: 1px solid #ddd;
+      padding: 12px;
+      text-align: left;
+    }
+
+    th {
+      background-color: #f9f9f9;
+      font-weight: bold;
+    }
+
+    tbody tr:nth-child(even) {
+      background-color: #fcfcfc;
+    }
+
+    /* Pagination */
+    .pagination {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 20px;
+    }
+
+    .pagination button {
+      padding: 8px 16px;
+      font-size: 14px;
+      color: white;
+      background-color: #0056b3;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .pagination button:hover {
+      background-color: #006cdd;
+    }
+
+    .pagination button:disabled {
+      background-color: #ccc;
+      cursor: not-allowed;
+    }
+    
+    .loading {
+      text-align: center;
+      padding: 30px;
+      font-size: 18px;
+      color: #888;
+    }
+
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <nav>
+      <button id="nav-config" class="nav-btn active">View Config</button>
+      <button id="nav-form" class="nav-btn">Temperature Log Form</button>
+      <button id="nav-logs" class="nav-btn">View Logs</button>
+    </nav>
+
+    <div id="page-config" class="page active">
+      <h1>Drone Configuration</h1>
+      <div id="config-loading" class="loading">Loading config...</div>
+      <div id="config-content" style="display: none;">
+        <div class="config-grid">
+          <strong>Drone ID:</strong>
+          <span id="config-id"></span>
+          <strong>Drone Name:</strong>
+          <span id="config-name"></span>
+          <strong>Light:</strong>
+          <span id="config-light"></span>
+          <strong>Country:</strong>
+          <span id="config-country"></span>
+          <strong>Weight:</strong>
+          <span id="config-weight"></span>
+        </div>
+      </div>
+      <div id="config-error" style="color: red; margin-top: 10px;"></div>
+    </div>
+
+    <div id="page-form" class="page">
+      <h1>Log New Temperature</h1>
+      <form id="temp-form" class="log-form">
+        <label for="celsius-input">Temperature in Celsius:</label>
+        <input type="number" id="celsius-input" step="0.1" required>
+        <button type="submit">Submit Data</button>
+      </form>
+      <div id="form-status"></div>
+    </div>
+
+    <div id="page-logs" class="page">
+      <h1>Drone Logs</h1>
+      <div id="logs-loading" class="loading" style="display: none;">Loading logs...</div>
+      <div id="logs-error" style="color: red; margin-top: 10px;"></div>
+      
+      <div class="logs-table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Created</th>
+              <th>Country</th>
+              <th>Drone ID</th>
+              <th>Drone Name</th>
+              <th>Celsius</th>
+            </tr>
+          </thead>
+          <tbody id="logs-table-body">
+            </tbody>
+        </table>
+      </div>
+      
+      <div class="pagination">
+        <button id="btn-prev" disabled>Previous</button>
+        <span id="page-info">Page 1</span>
+        <button id="btn-next">Next</button>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // --- Configuration ---
+    // !!! IMPORT_NOTE: เปลี่ยนค่านี้เป็น ID ของ Drone ที่คุณต้องการติดตาม
+    const DRONE_ID_TO_TRACK = 3001; 
+    
+    // !!! IMPORT_NOTE: ตรวจสอบว่า URL นี้ถูกต้องตรงกับ Backend ของคุณ
+    const API_BASE_URL = "http://localhost:3000"; 
+    
+    const LOGS_PER_PAGE = 12;
+
+    // --- Global State ---
+    // State สำหรับเก็บข้อมูล Config ที่ได้จาก Page #1 เพื่อใช้ใน Page #2
+    let droneConfig = {}; 
+    let currentLogPage = 1;
+
+    // --- DOM Elements ---
+    const pages = {
+      config: document.getElementById('page-config'),
+      form: document.getElementById('page-form'),
+      logs: document.getElementById('page-logs'),
+    };
+    const navButtons = {
+      config: document.getElementById('nav-config'),
+      form: document.getElementById('nav-form'),
+      logs: document.getElementById('nav-logs'),
+    };
+
+    // Page 1 Elements
+    const configLoading = document.getElementById('config-loading');
+    const configContent = document.getElementById('config-content');
+    const configError = document.getElementById('config-error');
+    const configId = document.getElementById('config-id');
+    const configName = document.getElementById('config-name');
+    const configLight = document.getElementById('config-light');
+    const configCountry = document.getElementById('config-country');
+    const configWeight = document.getElementById('config-weight'); // เพิ่ม weight ตาม code
+
+    // Page 2 Elements
+    const tempForm = document.getElementById('temp-form');
+    const celsiusInput = document.getElementById('celsius-input');
+    const formStatus = document.getElementById('form-status');
+
+    // Page 3 Elements
+    const logsLoading = document.getElementById('logs-loading');
+    const logsError = document.getElementById('logs-error');
+    const logsTableBody = document.getElementById('logs-table-body');
+    const btnPrev = document.getElementById('btn-prev');
+    const btnNext = document.getElementById('btn-next');
+    const pageInfo = document.getElementById('page-info');
+
+    // --- Page Navigation ---
+    function showPage(pageKey) {
+      // ซ่อนทุกหน้า
+      Object.values(pages).forEach(page => page.classList.remove('active'));
+      // ลบ active class จากทุกปุ่ม
+      Object.values(navButtons).forEach(btn => btn.classList.remove('active'));
+
+      // แสดงหน้าและปุ่มที่เลือก
+      pages[pageKey].classList.add('active');
+      navButtons[pageKey].classList.add('active');
+      
+      // โหลดข้อมูลเมื่อเปลี่ยนหน้า (ถ้าจำเป็น)
+      if (pageKey === 'logs') {
+        fetchLogs();
+      }
+    }
+
+    // --- Data Fetching & Rendering ---
+
+    /**
+     * Page #1: Fetch Config
+     * โหลดข้อมูล Config ของ Drone และเก็บไว้ใน global state 'droneConfig'
+     */
+    async function fetchConfig() {
+      configLoading.style.display = 'block';
+      configContent.style.display = 'none';
+      configError.textContent = '';
+      
+      try {
+        const response = await fetch(`${API_BASE_URL}/configs/${DRONE_ID_TO_TRACK}`);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch config: ${response.statusText}`);
+        }
+        const data = await response.json();
+
+        // เก็บข้อมูลใน Global State เพื่อใช้ใน Page #2
+        droneConfig = {
+          drone_id: data.drone_id,
+          drone_name: data.drone_name,
+          country: data.country
+        };
+
+        // แสดงผลใน Page #1
+        configId.textContent = data.drone_id;
+        configName.textContent = data.drone_name;
+        configLight.textContent = data.light;
+        configCountry.textContent = data.country;
+        configWeight.textContent = data.weight; // แสดง weight
+
+        configLoading.style.display = 'none';
+        configContent.style.display = 'block';
+
+      } catch (error) {
+        console.error("Error fetching config:", error);
+        configLoading.style.display = 'none';
+        configError.textContent = `Error: ${error.message}. Please check if the backend is running.`;
+      }
+    }
+
+    /**
+     * Page #3: Fetch Logs
+     * โหลด Log ของ Drone ตาม ID และ Page ที่กำหนด
+     */
+    async function fetchLogs() {
+      logsLoading.style.display = 'block';
+      logsError.textContent = '';
+      logsTableBody.innerHTML = ''; // ล้างตารางเก่า
+      
+      try {
+        const response = await fetch(`${API_BASE_URL}/logs/${DRONE_ID_TO_TRACK}?page=${currentLogPage}&perPage=${LOGS_PER_PAGE}`);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch logs: ${response.statusText}`);
+        }
+        const logs = await response.json();
+        
+        logsLoading.style.display = 'none';
+
+        if (logs.length === 0 && currentLogPage === 1) {
+          logsTableBody.innerHTML = '<tr><td colspan="5" style="text-align: center;">No logs found.</td></tr>';
+        } else {
+          renderLogs(logs);
+        }
+
+        // อัปเดตปุ่ม Pagination
+        btnPrev.disabled = (currentLogPage === 1);
+        btnNext.disabled = (logs.length < LOGS_PER_PAGE); // ถ้าข้อมูลน้อยกว่า 12 แสดงว่าอยู่หน้าสุดท้าย
+        pageInfo.textContent = `Page ${currentLogPage}`;
+
+      } catch (error) {
+        console.error("Error fetching logs:", error);
+        logsLoading.style.display = 'none';
+        logsError.textContent = `Error: ${error.message}`;
+      }
+    }
+
+    /**
+     * Page #3: Render Logs
+     * นำข้อมูล Log มาสร้างเป็นแถวในตาราง
+     */
+    function renderLogs(logs) {
+      logsTableBody.innerHTML = ''; // เคลียร์ตาราง
+      logs.forEach(log => {
+        const row = document.createElement('tr');
+        
+        // จัดการ format วันที่
+        const createdDate = new Date(log.created).toLocaleString('th-TH');
+
+        row.innerHTML = `
+          <td>${createdDate}</td>
+          <td>${log.country}</td>
+          <td>${log.drone_id}</td>
+          <td>${log.drone_name}</td>
+          <td>${log.celsius}</td>
+        `;
+        logsTableBody.appendChild(row);
+      });
+    }
+
+    /**
+     * Page #2: Handle Form Submit
+     * ส่งข้อมูลจากฟอร์มไปสร้าง Log ใหม่
+     */
+    async function handleLogSubmit(event) {
+      event.preventDefault(); // ป้องกันหน้า refresh
+      formStatus.textContent = 'Submitting...';
+      formStatus.style.color = '#555';
+
+      const celsius = parseFloat(celsiusInput.value);
+      if (isNaN(celsius)) {
+        formStatus.textContent = 'Please enter a valid number for temperature.';
+        formStatus.style.color = 'red';
+        return;
+      }
+
+      // ตรวจสอบว่ามีข้อมูล Config (จาก Page #1) หรือยัง
+      if (!droneConfig.drone_id) {
+        formStatus.textContent = 'Drone config not loaded. Please visit "View Config" tab first.';
+        formStatus.style.color = 'red';
+        return;
+      }
+
+      const payload = {
+        drone_id: droneConfig.drone_id,
+        drone_name: droneConfig.drone_name,
+        country: droneConfig.country,
+        celsius: celsius
+      };
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/logs`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to create log: ${response.statusText}`);
+        }
+
+        const result = await response.json();
+        formStatus.textContent = 'Log created successfully!';
+        formStatus.style.color = 'green';
+        celsiusInput.value = ''; // เคลียร์ input
+
+        // เมื่อสร้าง Log สำเร็จ ให้ไปหน้า Logs และโหลดข้อมูลใหม่
+        currentLogPage = 1; // กลับไปหน้า 1
+        showPage('logs'); 
+
+      } catch (error) {
+        console.error("Error submitting log:", error);
+        formStatus.textContent = `Error: ${error.message}`;
+        formStatus.style.color = 'red';
+      }
+    }
+
+    // --- Event Listeners ---
+    
+    // Navigation
+    navButtons.config.addEventListener('click', () => showPage('config'));
+    navButtons.form.addEventListener('click', () => {
+      formStatus.textContent = ''; // เคลียร์ status ทุกครั้งที่มาหน้านี้
+      showPage('form');
+    });
+    navButtons.logs.addEventListener('click', () => {
+      currentLogPage = 1; // กดที่ Tab ให้เริ่มที่หน้า 1 เสมอ
+      showPage('logs');
+    });
+
+    // Page 2: Form
+    tempForm.addEventListener('submit', handleLogSubmit);
+
+    // Page 3: Pagination
+    btnPrev.addEventListener('click', () => {
+      if (currentLogPage > 1) {
+        currentLogPage--;
+        fetchLogs();
+      }
+    });
+
+    btnNext.addEventListener('click', () => {
+      currentLogPage++;
+      fetchLogs();
+    });
+
+    // --- Initial Load ---
+    // เมื่อหน้าเว็บโหลดเสร็จ
+    document.addEventListener('DOMContentLoaded', () => {
+      // โหลด Config ทันทีเมื่อเปิดหน้า
+      // เพื่อให้ข้อมูลพร้อมสำหรับ Page #2
+      fetchConfig(); 
+      
+      // แสดงหน้า Config เป็นหน้าแรก
+      showPage('config'); 
+    });
+
+  </script>
+</body>
+</html>
